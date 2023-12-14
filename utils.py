@@ -114,15 +114,14 @@ class Recall(_Metric):
 
 
 class NDCG(_Metric):
-    """
+    '''
     NDCG in top-k samples
     In this work, NDCG = log(2)/log(1+hit_positions)
-    """
+    '''
 
     def DCG(self, hit):
-        hit = hit / torch.log2(
-            torch.arange(2, self.topk + 2, device=self.device, dtype=torch.float)
-        )
+        a = torch.log2(torch.arange(2, self.topk+2,
+                                          device=self.device, dtype=torch.float))
         hit = torch.tensor(hit, device=self.device)
         hit = hit / a
         return hit.sum(-1)
@@ -132,9 +131,10 @@ class NDCG(_Metric):
         hit[:num_pos] = 1
         return self.DCG(hit)
 
-    def __init__(self, topk):
+    def __init__(self, topk, device=torch.device('cuda' if torch.cuda.is_available() else 'cpu')):
         super().__init__()
         self.topk = topk
+        self.device = device
         self.IDCGs = torch.empty(1 + self.topk, dtype=torch.float).to(self.device)
         self.IDCGs[0] = 1  # avoid 0/0
         for i in range(1, self.topk + 1):
@@ -147,9 +147,9 @@ class NDCG(_Metric):
         device = scores.device
         is_hit = get_is_hit(scores, ground_truth, self.topk)
         num_pos = ground_truth.sum(dim=1).clamp(0, self.topk).to(torch.long).to(self.device)
-        dcg = self.DCG(is_hit, device)
+        dcg = self.DCG(is_hit)
         idcg = self.IDCGs[num_pos]
-        ndcg = dcg / idcg.to(device)
+        ndcg = dcg/idcg.to(self.device)
         self._cnt += scores.shape[0] - (num_pos == 0).sum().item()
         self._sum += ndcg.sum().item()
 
