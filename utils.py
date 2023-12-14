@@ -119,10 +119,12 @@ class NDCG(_Metric):
     In this work, NDCG = log(2)/log(1+hit_positions)
     """
 
-    def DCG(self, hit, device=torch.device("cpu")):
+    def DCG(self, hit):
         hit = hit / torch.log2(
-            torch.arange(2, self.topk + 2, device=device, dtype=torch.float)
+            torch.arange(2, self.topk + 2, device=self.device, dtype=torch.float)
         )
+        hit = torch.tensor(hit, device=self.device)
+        hit = hit / a
         return hit.sum(-1)
 
     def IDCG(self, num_pos):
@@ -133,7 +135,7 @@ class NDCG(_Metric):
     def __init__(self, topk):
         super().__init__()
         self.topk = topk
-        self.IDCGs = torch.empty(1 + self.topk, dtype=torch.float)
+        self.IDCGs = torch.empty(1 + self.topk, dtype=torch.float).to(self.device)
         self.IDCGs[0] = 1  # avoid 0/0
         for i in range(1, self.topk + 1):
             self.IDCGs[i] = self.IDCG(i)
@@ -144,7 +146,7 @@ class NDCG(_Metric):
     def __call__(self, scores, ground_truth):
         device = scores.device
         is_hit = get_is_hit(scores, ground_truth, self.topk)
-        num_pos = ground_truth.sum(dim=1).clamp(0, self.topk).to(torch.long)
+        num_pos = ground_truth.sum(dim=1).clamp(0, self.topk).to(torch.long).to(self.device)
         dcg = self.DCG(is_hit, device)
         idcg = self.IDCGs[num_pos]
         ndcg = dcg / idcg.to(device)
